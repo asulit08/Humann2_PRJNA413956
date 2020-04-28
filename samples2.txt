@@ -1,0 +1,3 @@
+sample	file_mate1	file_mate2	file_singles	group
+SRR6159233	/mnt/DATA/seb/data/crc/2019/PRJNA413956/analyses/results/02_star/SRR6159233-1/Unmapped.out.mate1	/mnt/DATA/seb/data/crc/2019/PRJNA413956/analyses/results/02_star/SRR6159233-1/Unmapped.out.mate2		coloncancer
+SRR6159234	/mnt/DATA/seb/data/crc/2019/PRJNA413956/analyses/results/02_star/SRR6159234-1/Unmapped.out.mate1	/mnt/DATA/seb/data/crc/2019/PRJNA413956/analyses/results/02_star/SRR6159234-1/Unmapped.out.mate2		normal
