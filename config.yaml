@@ -1,3 +1,26 @@
-resultdir: /mnt/DATA/arielle/crc/Humann2/20200219_PRJNA419536/analysis/
+resultdir: /mnt/DATA/arielle/crc/Humann2/20200428_regrouptest/analyses
 
-samples: /home/arielle/CRC_Study/Projects/20200202_metafunc/PRJNA413956_samples.txt
+samples: samples2.txt #/home/arielle/CRC_Study/Projects/20200202_metafunc/PRJNA413956_samples.txt
+
+# should trimming be performed (fastp)?
+trimming:
+    perform: True
+    # any extra arguments submitted to fastp
+    extra: ""
+    trim_env: /home/arielle/CRC_Study/Projects/metafunc/envs/fastp.yaml
+
+mapping:
+    perform: True
+    index: /mnt/DATA/shared_data/Kaiju/star_human/genome
+    # any extra arguments submitted to STAR
+    star_extra: ""
+    star_wrap: file://wrapper/star
+    map_env: /home/arielle/CRC_Study/Projects/metafunc/envs/star.yaml
+
+humann_env: /home/arielle/conda_yaml/20200214_Humann.yaml
+prescreen: 0.001
+
+
+
+
+

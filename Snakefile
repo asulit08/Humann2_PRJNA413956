@@ -19,7 +19,7 @@ min_version("5.4.0")
 ## =============================================================================
 
 ## DEFAULT PATHS
-DIR_ENVS    = "/home/arielle/conda_yaml/20200214_Humann.yaml"
+#DIR_ENVS    = "/home/arielle/conda_yaml/20200214_Humann.yaml"
 
 ## LOAD VARIABLES FROM CONFIGFILE
 ## submit on command-line via --configfile
@@ -43,6 +43,7 @@ DIR_LOGS       = join(DIR_BASE, "logs")
 DIR_BENCHMARKS = join(DIR_BASE, "benchmarks")
 DIR_RES        = join(DIR_BASE, "results")
 
+#star_wrap = config["star_wrap"]
 
 ## =============================================================================
 ## SAMPLES
@@ -114,16 +115,30 @@ sys.stderr.flush()
 ## FUNCTIONS
 ## =============================================================================
 
-#def get_fastq1(wildcards):
-#    return SAMPLES.loc[wildcards.sample, "file_mate1"]
+def get_singles_raw(wildcards):
+    return SAMPLES.loc[wildcards.sample, "file_singles"]
 
 
-#def get_fastq2(wildcards):
-#    return SAMPLES.loc[wildcards.sample, "file_mate2"]
+def get_fq_pe(wildcards):
+    return [SAMPLES.loc[wildcards.sample, "file_mate1"], 
+            SAMPLES.loc[wildcards.sample, "file_mate2"]]
 
 
-#def get_singles(wildcards):
-#    return SAMPLES.loc[wildcards.sample, "file_singles"]
+def get_data_for_mapping_pe(wildcards):
+    # either raw or trimmed
+    if config["trimming"]["perform"]:
+        return [join(DIR_RES, "samples/trimmed/pe/{}.1.fastq.gz".format(wildcards.sample)),
+                join(DIR_RES, "samples/trimmed/pe/{}.2.fastq.gz".format(wildcards.sample))]
+    else:
+        return get_fq_pe(wildcards) 
+
+
+def get_data_for_mapping_se(wildcards):
+    # either raw or trimmed
+    if config["trimming"]["perform"]:
+        return join(DIR_RES, "samples/trimmed/se/{}.fastq.gz".format(wildcards.sample))
+    else:
+        return SAMPLES.loc[wildcards.sample, "file_singles"]
 
 
 def get_data(wildcards):
@@ -132,16 +147,37 @@ def get_data(wildcards):
     fq3 = pd.notnull(SAMPLES.loc[wildcards.sample, "file_singles"])  # True or False
     
     if fq1 and fq2 and fq3:
-        data = [SAMPLES.loc[wildcards.sample, "file_mate1"], SAMPLES.loc[wildcards.sample, "file_mate2"], SAMPLES.loc[wildcards.sample, "file_singles"]]
+        if config["mapping"]["perform"]:
+            return [join(DIR_RES, "samples/map/pe/{}/Unmapped.out.mate1").format(wildcards.sample),
+            join(DIR_RES, "samples/map/pe/{}/Unmapped.out.mate2").format(wildcards.sample),
+            join(DIR_RES, "samples/map/se/{}/Unmapped.out.mate1").format(wildcards.sample)
+            ]
+        elif config["trimming"]["perform"]:
+            return [join(DIR_RES, "samples/trimmed/pe/{}.1.fastq.gz".format(wildcards.sample)),
+                join(DIR_RES, "samples/trimmed/pe/{}.2.fastq.gz".format(wildcards.sample)), join(DIR_RES, "samples/trimmed/se/{}.fastq.gz".format(wildcards.sample))]
+        else:
+            return [SAMPLES.loc[wildcards.sample, "file_mate1"], SAMPLES.loc[wildcards.sample, "file_mate2"], SAMPLES.loc[wildcards.sample, "file_singles"]]
     elif fq1 and fq2 and not fq3:
-        data = [SAMPLES.loc[wildcards.sample, "file_mate1"], SAMPLES.loc[wildcards.sample, "file_mate2"]]
+        if config["mapping"]["perform"]:
+            return [join(DIR_RES, "samples/map/pe/{}/Unmapped.out.mate1").format(wildcards.sample),
+            join(DIR_RES, "samples/map/pe/{}/Unmapped.out.mate2").format(wildcards.sample),
+            ]
+        elif config["trimming"]["perform"]:
+            return [join(DIR_RES, "samples/trimmed/pe/{}.1.fastq.gz".format(wildcards.sample)),
+                join(DIR_RES, "samples/trimmed/pe/{}.2.fastq.gz".format(wildcards.sample))
+                ]
+        else:
+            return [SAMPLES.loc[wildcards.sample, "file_mate1"], SAMPLES.loc[wildcards.sample, "file_mate2"]]
     elif fq3 and not fq1 and not fq2:
-        data = [SAMPLES.loc[wildcards.sample, "file_singles"]]
+        if config["mapping"]["perform"]:
+            return join(DIR_RES, "samples/map/se/{}/Unmapped.out.mate1").format(wildcards.sample)
+        elif config["trimming"]["perform"]:
+            return join(DIR_RES, "samples/trimmed/se/{}.fastq.gz".format(wildcards.sample))
+        else:
+            return SAMPLES.loc[wildcards.sample, "file_singles"]
     else:
         sys.stderr.write("Wrong samplesheet.")
         sys.exit()
-
-    return data 
     
 
 ## =============================================================================
@@ -159,44 +195,173 @@ def get_data(wildcards):
 ## Pseudo-rule to state the final targets, so that the whole runs
 
 rule all:
-    input: expand("{sample}.remove.done", sample=SAMPLES["sample"])
+    input: expand(join(DIR_RES, "Humann2_Run/{sample}.remove.done"), sample=SAMPLES["sample"])
+
+rule trim_pe:
+    input:
+        fq = get_fq_pe
+    output:
+        trimmed1=temp(join(DIR_RES, "samples/trimmed/pe/{sample}.1.fastq.gz")), 
+        trimmed2=temp(join(DIR_RES, "samples/trimmed/pe/{sample}.2.fastq.gz")),
+        html=join(DIR_RES, "samples/trimmed/report/pe/{sample}.fastp.html"),
+        json=join(DIR_RES, "samples/trimmed/report/pe/{sample}.fastp.json")
+    log:
+        join(DIR_LOGS, "samples/trimming/{sample}_pe.log")
+    priority: 20
+    benchmark:
+        join(DIR_BENCHMARKS, "samples/trimming/{sample}_trim_pe.txt")
+    params:
+        extra=config["trimming"]["extra"]
+    threads: 8
+    conda:
+        config["trimming"]["trim_env"]
+    shell:
+        "fastp --thread {threads} {params.extra} "
+        "--in1 {input.fq[0]} --in2 {input.fq[1]} "
+        "--out1 {output.trimmed1} --out2 {output.trimmed2} "
+        "--html {output.html} --json {output.json} > {log} 2>&1"
+
+rule trim_se:
+    input:
+        sample=get_singles_raw
+    output:
+        trimmed=temp(join(DIR_RES, "samples/trimmed/se/{sample}.fastq.gz")),
+        html=join(DIR_RES, "samples/trimmed/report/se/{sample}.fastp.html"),
+        json=join(DIR_RES, "samples/trimmed/report/se/{sample}.fastp.json")
+    log:
+        join(DIR_LOGS, "samples/trimming/{sample}_se.log")
+    priority: 20
+    benchmark:
+        join(DIR_BENCHMARKS, "samples/trimming/{sample}_trim_se.txt")
+    params:
+        extra=config["trimming"]["extra"]
+    threads: 8
+    conda:
+        config["trimming"]["trim_env"]
+    shell:
+        "fastp --thread {threads} {params.extra} --in1 {input.sample} "
+        "--out1 {output.trimmed} "
+        "--html {output.html} --json {output.json} > {log} 2>&1"
+
+rule star_mapping_pe:
+    input:
+        sample=get_data_for_mapping_pe
+    output:
+        unmapped1=temp(join(DIR_RES, "samples/map/pe/{sample}/Unmapped.out.mate1")),
+        unmapped2=temp(join(DIR_RES, "samples/map/pe/{sample}/Unmapped.out.mate2")),
+        #sam=temp(join(DIR_RES, "samples/map/pe/{sample}/Aligned.out.sam"))
+    priority: 10
+    log:
+        join(DIR_LOGS, "samples/star_mapping/{sample}_pe.log")
+    benchmark:
+        join(DIR_BENCHMARKS, "samples/star_mapping/{sample}_pe.txt")
+    conda:
+        config["mapping"]["map_env"]
+    params:
+        # path to STAR reference genome index
+        index=config["mapping"]["index"],
+        #annotation=config["mapping"]["annotation"],
+        extra=config["mapping"]["star_extra"]
+    threads: 8
+    wrapper:
+        config["mapping"]["star_wrap"]
+
+
+rule star_mapping_se:
+    input:
+        sample=get_data_for_mapping_se
+    output:
+        unmapped=temp(join(DIR_RES, "samples/map/se/{sample}/Unmapped.out.mate1")),
+        #sam=temp(join(DIR_RES, "samples/map/se/{sample}/Aligned.out.sam"))
+    priority: 10
+    log:
+        join(DIR_LOGS, "samples/star_mapping/{sample}_se.log")
+    benchmark:
+        join(DIR_BENCHMARKS, "samples/star_mapping/{sample}_se.txt")
+    conda:
+        config["mapping"]["map_env"]
+    params:
+        # path to STAR reference genome index
+        index=config["mapping"]["index"],
+        #annotation=config["mapping"]["annotation"],
+        extra=config["mapping"]["star_extra"]
+    threads: 8
+    wrapper:
+        config["mapping"]["star_wrap"]
 
 rule combine:
     input:
         get_data
     output:
-        join(DIR_RES, "cat_input/{sample}.fq.gz")
+        temp(join(DIR_RES, "samples/cat_input/{sample}.fq.gz"))
     benchmark:
-        join(DIR_BENCHMARKS, "{sample}.combineinput.txt")
+        join(DIR_BENCHMARKS, "samples/{sample}.combineinput.txt")
     shell:
         "cat {input} | gzip > {output}"
 
 rule humann:
     input: 
-        join(DIR_RES, "cat_input/{sample}.fq.gz")
+        join(DIR_RES, "samples/cat_input/{sample}.fq.gz")
     output:
-        directory(join(DIR_RES, "Humann2_Run/{sample}_humann2_out/"))
+        temp(touch(join(DIR_RES, "Humann2_Run/{sample}.humann2.done")))
     log:
         humout = join(DIR_LOGS, "Humann2_Run/{sample}.humann2.out"),
         humerr = join(DIR_LOGS, "Humann2_Run/{sample}.humann2.err")
+    params:
+        prescreen = config["prescreen"],
+        outp = directory(join(DIR_RES, "Humann2_Run/{sample}_humann2_out/"))
     benchmark:
-        join(DIR_BENCHMARKS, "{sample}.humann2Run.txt")
+        join(DIR_BENCHMARKS, "humann2/{sample}.humann2Run.txt")
     conda:
-        DIR_ENVS
+        config["humann_env"]
+    threads: 8
     shell:
-        "humann2 --input {input} --output {output} 1> {log.humout} 2> {log.humerr}"
+        "humann2 --input {input} --threads {threads} --prescreen-threshold {params.prescreen} --output {params.outp} 1> {log.humout} 2> {log.humerr}"
+
+rule humann_regroup:
+    input: 
+        rules.humann.output
+    output:
+        temp(join(DIR_RES, "Humann2_Run/{sample}_humann2_out/regroup/{sample}_uniref90go.tsv"))
+    params:
+        inp = join(DIR_RES, "Humann2_Run/{sample}_humann2_out/{sample}_genefamilies.tsv"),
+        groups = "uniref90_go"
+    log:
+        regout = join(DIR_LOGS, "Humann2_Run/{sample}.humann2_regroup.out"),
+        regerr = join(DIR_LOGS, "Humann2_Run/{sample}.humann2_regroup.err")
+    benchmark:
+        join(DIR_BENCHMARKS, "humann2/{sample}.humann2_regroup.txt")
+    conda:
+        config["humann_env"]
+    shell:
+        "humann2_regroup_table --input {params.inp} --groups {params.groups} --output {output} 1> {log.regout} 2> {log.regerr}"
+    
+rule humann_rename:
+    input:
+        rules.humann_regroup.output
+    output:
+        join(DIR_RES, "Humann2_Run/{sample}_humann2_out/regroup/{sample}_uniref90go_names.tsv")
+    log:
+        nameout = join(DIR_LOGS, "Humann2_Run/{sample}.humann2_rename.out"),
+        nameerr = join(DIR_LOGS, "Humann2_Run/{sample}.humann2_rename.err")
+    benchmark:
+        join(DIR_BENCHMARKS, "humann2/{sample}.humann2_rename.txt")
+    conda:
+        config["humann_env"]
+    shell:
+        "humann2_rename_table -i {input} -n go -o {output} 1> {log.nameout} 2> {log.nameerr}"
     
 rule humann_mv:
     input: 
-        rules.humann.output
+        rules.humann_rename.output
     params:
         log = join(DIR_RES, "Humann2_Run/{sample}_humann2_out/{sample}_humann2_temp/{sample}.log"),
         bugs = join(DIR_RES, "Humann2_Run/{sample}_humann2_out/{sample}_humann2_temp/{sample}_metaphlan_bugs_list.tsv"),
         outmv = join(DIR_RES, "Humann2_Run/{sample}_humann2_out/")
     output:
-        temp(touch("{sample}.mv.done"))
+        temp(touch(join(DIR_RES, "Humann2_Run/{sample}.mv.done")))
     benchmark:
-        join(DIR_BENCHMARKS, "{sample}.humann2mv.txt")
+        join(DIR_BENCHMARKS, "humann2/{sample}.humann2mv.txt")
     shell:
         "mv {params.log} {params.bugs} {params.outmv}"
 
@@ -208,9 +373,9 @@ rule humann_compress:
         outdir = join(DIR_RES, "Humann2_Run/{sample}_humann2_out/"),
         in2comp = "{sample}_humann2_temp"
     output:
-        temp(touch("{sample}.compress.done"))
+        temp(touch(join(DIR_RES, "Humann2_Run/{sample}.compress.done")))
     benchmark:
-        join(DIR_BENCHMARKS, "{sample}.humann2compress.txt")
+        join(DIR_BENCHMARKS, "humann2/{sample}.humann2compress.txt")
     shell:
         "tar -C {params.outdir} -cvzf {params.outcom} {params.in2comp}"
 
@@ -218,10 +383,10 @@ rule humann_rm:
     input:
         rules.humann_compress.output
     output:
-        temp(touch("{sample}.remove.done"))
+        temp(touch(join(DIR_RES, "Humann2_Run/{sample}.remove.done")))
     params:
         torem = join(DIR_RES, "Humann2_Run/{sample}_humann2_out/{sample}_humann2_temp")
     benchmark:
-        join(DIR_BENCHMARKS, "{sample}.humann2rm.txt")
+        join(DIR_BENCHMARKS, "humann2/{sample}.humann2rm.txt")
     shell:
         "rm -r {params.torem}"
