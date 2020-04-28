@@ -1,0 +1,2 @@
+sample	file_mate1	file_mate2	file_singles	group
+SRR6067723	.test/fq/SRR6067723.1.fq	.test/fq/SRR6067723.2.fq		coloncancer
