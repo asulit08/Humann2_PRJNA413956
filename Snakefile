@@ -315,8 +315,8 @@ rule humann:
     conda:
         config["humann_env"]
     threads: 8
-    resources:
-        const=1
+    #resources:
+    #    const=1
     shell:
         "humann2 --input {input} --threads {threads} --prescreen-threshold {params.prescreen} --output {params.outp} 1> {log.humout} 2> {log.humerr}"
 
