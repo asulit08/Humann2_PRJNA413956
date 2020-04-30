@@ -1,6 +1,6 @@
-resultdir: /mnt/DATA/arielle/crc/Humann2/20200428_regrouptest/analyses
+resultdir: /mnt/DATA/arielle/crc/Humann2/20200430_PRJNA413956/analyses
 
-samples: samples2.txt #/home/arielle/CRC_Study/Projects/20200202_metafunc/PRJNA413956_samples.txt
+samples: PRJNA413956_samples.txt #/home/arielle/CRC_Study/Projects/20200202_metafunc/PRJNA413956_samples.txt
 
 # should trimming be performed (fastp)?
 trimming:
