@@ -44,6 +44,7 @@ shell(
     "{readcmd} "
     "--outFileNamePrefix {outprefix} "
     "--outReadsUnmapped Fastx "
+    "--sjdbGTFfile {snakemake.params.annotation} "
     "--outSAMmode None "
     "--outSAMtype None "
     "--outStd Log "

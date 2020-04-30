@@ -260,7 +260,7 @@ rule star_mapping_pe:
     params:
         # path to STAR reference genome index
         index=config["mapping"]["index"],
-        #annotation=config["mapping"]["annotation"],
+        annotation=config["mapping"]["annotation"],
         extra=config["mapping"]["star_extra"]
     threads: 8
     wrapper:
@@ -283,7 +283,7 @@ rule star_mapping_se:
     params:
         # path to STAR reference genome index
         index=config["mapping"]["index"],
-        #annotation=config["mapping"]["annotation"],
+        annotation=config["mapping"]["annotation"],
         extra=config["mapping"]["star_extra"]
     threads: 8
     wrapper:

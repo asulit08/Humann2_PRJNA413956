@@ -12,6 +12,7 @@ trimming:
 mapping:
     perform: True
     index: /mnt/DATA/shared_data/Kaiju/star_human/genome
+    annotation: /mnt/DATA/shared_data/Kaiju/star_human/gencode.v33.primary_assembly.annotation.gtf 
     # any extra arguments submitted to STAR
     star_extra: ""
     star_wrap: file://wrapper/star
